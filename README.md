@@ -5,9 +5,10 @@ hardware-specific layer supplies callbacks for configuring, transmitting, and
 receiving bytes.
 
 The default configuration is **115200 baud, 8 data bits, no parity, 1 stop
-bit (8N1)**. The driver does not access registers or allocate memory, so it
-can be adapted to an MCU HAL, bare-metal implementation, or board support
-package.
+bit (8N1)**. `uart_init_with_config` makes framing explicit and rejects
+unsupported settings; this implementation currently accepts only 8N1. The
+driver does not access registers or allocate memory, so it can be adapted to
+an MCU HAL, bare-metal implementation, or board support package.
 
 ## Build
 
@@ -29,7 +30,10 @@ counters for successful reads, writes, and backend errors.
 The test suite also verifies intact transmission and reception of a 100-byte
 payload.
 
-The tests include a serial-input case that receives the byte value `100`.
+The tests include serial-input cases that receive byte values `50` and `100`,
+plus a check that `0xFF` is preserved as unsigned byte value `255`.
+They also cover positive backend receive status as a timeout and negative
+backend receive status as an I/O error, including diagnostics accounting.
 
 ## FMCW sweep generation
 

@@ -19,6 +19,19 @@ typedef enum {
     UART_CARRIAGE_RETURN_LINE_FEED = 1
 } uart_line_ending_t;
 
+typedef enum {
+    UART_PARITY_NONE = 0,
+    UART_PARITY_EVEN = 1,
+    UART_PARITY_ODD = 2
+} uart_parity_t;
+
+typedef struct {
+    uint32_t baud_rate;
+    uint8_t data_bits;
+    uint8_t stop_bits;
+    uart_parity_t parity;
+} uart_config_t;
+
 typedef int (*uart_square_wave_fn)(void *context,
                                    uint32_t frequency_hz,
                                    uint32_t cycles);
@@ -51,6 +64,9 @@ uart_status_t uart_init(uart_t *uart, const uart_backend_t *backend);
 uart_status_t uart_init_with_baud(uart_t *uart,
                                   const uart_backend_t *backend,
                                   uint32_t baud_rate);
+uart_status_t uart_init_with_config(uart_t *uart,
+                                    const uart_backend_t *backend,
+                                    const uart_config_t *config);
 uart_status_t uart_write(uart_t *uart, const uint8_t *data, size_t length);
 uart_status_t uart_write_line(uart_t *uart,
                               const uint8_t *data,

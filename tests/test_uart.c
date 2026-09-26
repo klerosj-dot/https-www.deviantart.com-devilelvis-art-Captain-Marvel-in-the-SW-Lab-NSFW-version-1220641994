@@ -10,6 +10,7 @@ typedef struct {
     uint8_t received[128];
     size_t received_length;
     uint32_t read_timeout;
+    int read_result;
     uint32_t square_wave_frequency;
     uint32_t square_wave_cycles;
 } mock_uart_t;
@@ -35,6 +36,9 @@ static int mock_write(void *context, const uint8_t *data, size_t length)
 static int mock_read(void *context, uint8_t *data, size_t length, uint32_t timeout_ms)
 {
     mock_uart_t *mock = context;
+    if (mock->read_result != 0) {
+        return mock->read_result;
+    }
     if (length > mock->received_length) {
         return -1;
     }
@@ -85,6 +89,49 @@ static int test_default_initialization(void)
         expect(uart.baud_rate == UART_DEFAULT_BAUD_RATE, "UART stores default baud")) {
         return 1;
     }
+    return 0;
+}
+
+static int test_invalid_framing_configuration(void)
+{
+    mock_uart_t mock = {0};
+    uart_backend_t backend = mock_backend(&mock);
+    uart_t uart = {0};
+    uart_config_t config = {
+        .baud_rate = UART_DEFAULT_BAUD_RATE,
+        .data_bits = 7u,
+        .stop_bits = 1u,
+        .parity = UART_PARITY_NONE
+    };
+
+    if (expect(uart_init_with_config(&uart, &backend, &config) ==
+                   UART_INVALID_ARGUMENT,
+               "7 data bits are rejected") ||
+        expect(mock.configured_baud == 0u,
+               "invalid framing does not configure backend")) {
+        return 1;
+    }
+
+    config.data_bits = 8u;
+    config.parity = UART_PARITY_EVEN;
+    if (expect(uart_init_with_config(&uart, &backend, &config) ==
+                   UART_INVALID_ARGUMENT,
+               "even parity is rejected") ||
+        expect(mock.configured_baud == 0u,
+               "invalid parity does not configure backend")) {
+        return 1;
+    }
+
+    config.parity = UART_PARITY_NONE;
+    config.stop_bits = 2u;
+    if (expect(uart_init_with_config(&uart, &backend, &config) ==
+                   UART_INVALID_ARGUMENT,
+               "two stop bits are rejected") ||
+        expect(mock.configured_baud == 0u,
+               "invalid stop bits do not configure backend")) {
+        return 1;
+    }
+
     return 0;
 }
 
@@ -198,6 +245,82 @@ static int test_serial_input_value_100(void)
     return 0;
 }
 
+static int test_serial_input_value_50(void)
+{
+    mock_uart_t mock = {
+        .received = {50u},
+        .received_length = 1u
+    };
+    uart_backend_t backend = mock_backend(&mock);
+    uart_t uart = {0};
+    uint8_t value = 0u;
+
+    if (expect(uart_init(&uart, &backend) == UART_OK,
+               "serial-input 50 test initializes UART") ||
+        expect(uart_read(&uart, &value, 1u, 100u) == UART_OK,
+               "serial-input value 50 read succeeds") ||
+        expect(value == 50u, "serial-input value is 50")) {
+        return 1;
+    }
+    return 0;
+}
+
+static int test_unsigned_byte_receive(void)
+{
+    mock_uart_t mock = {
+        .received = {UINT8_MAX},
+        .received_length = 1u
+    };
+    uart_backend_t backend = mock_backend(&mock);
+    uart_t uart = {0};
+    uint8_t value = 0u;
+
+    if (expect(uart_init(&uart, &backend) == UART_OK,
+               "unsigned-byte test initializes UART") ||
+        expect(uart_read(&uart, &value, 1u, 100u) == UART_OK,
+               "unsigned-byte receive succeeds") ||
+        expect(value == UINT8_MAX,
+               "0xFF is preserved as unsigned byte value 255")) {
+        return 1;
+    }
+    return 0;
+}
+
+static int test_receive_failures(void)
+{
+    mock_uart_t mock = {
+        .received = {'O'},
+        .received_length = 1u,
+        .read_result = 1
+    };
+    uart_backend_t backend = mock_backend(&mock);
+    uart_t uart = {0};
+    uart_diagnostics_t diagnostics;
+    uint8_t received = 0u;
+
+    if (expect(uart_init(&uart, &backend) == UART_OK,
+               "receive-failure test initializes UART") ||
+        expect(uart_read(&uart, &received, 1u, 10u) == UART_TIMEOUT,
+               "positive backend read status maps to timeout") ||
+        expect(uart_get_diagnostics(&uart, &diagnostics) == UART_OK,
+               "diagnostics available after timeout") ||
+        expect(diagnostics.read_operations == 0u && diagnostics.error_count == 1u,
+               "timeout increments errors but not successful reads")) {
+        return 1;
+    }
+
+    mock.read_result = -1;
+    if (expect(uart_read(&uart, &received, 1u, 10u) == UART_IO_ERROR,
+               "negative backend read status maps to I/O error") ||
+        expect(uart_get_diagnostics(&uart, &diagnostics) == UART_OK,
+               "diagnostics available after I/O error") ||
+        expect(diagnostics.read_operations == 0u && diagnostics.error_count == 2u,
+               "I/O error increments errors but not successful reads")) {
+        return 1;
+    }
+    return 0;
+}
+
 static int test_invalid_usage(void)
 {
     uart_t uart = {0};
@@ -219,8 +342,12 @@ static int test_invalid_usage(void)
 int main(void)
 {
     return test_default_initialization() ||
+           test_invalid_framing_configuration() ||
            test_custom_baud_and_io() ||
            test_100_byte_transfer() ||
            test_serial_input_value_100() ||
+           test_serial_input_value_50() ||
+           test_unsigned_byte_receive() ||
+           test_receive_failures() ||
            test_invalid_usage();
 }

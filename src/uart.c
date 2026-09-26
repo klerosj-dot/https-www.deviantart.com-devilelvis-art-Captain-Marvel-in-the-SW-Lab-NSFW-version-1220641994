@@ -17,21 +17,41 @@ uart_status_t uart_init_with_baud(uart_t *uart,
                                   const uart_backend_t *backend,
                                   uint32_t baud_rate)
 {
-    if (uart == NULL || !backend_is_valid(backend) || baud_rate == 0u) {
+    const uart_config_t config = {
+        .baud_rate = baud_rate,
+        .data_bits = 8u,
+        .stop_bits = 1u,
+        .parity = UART_PARITY_NONE
+    };
+
+    return uart_init_with_config(uart, backend, &config);
+}
+
+uart_status_t uart_init_with_config(uart_t *uart,
+                                    const uart_backend_t *backend,
+                                    const uart_config_t *config)
+{
+    if (uart == NULL || !backend_is_valid(backend) || config == NULL ||
+        config->baud_rate == 0u ||
+        config->data_bits != 8u ||
+        config->stop_bits != 1u ||
+        config->parity != UART_PARITY_NONE) {
         return UART_INVALID_ARGUMENT;
     }
 
-    if (backend->configure(backend->context, baud_rate) != 0) {
+    if (backend->configure(backend->context, config->baud_rate) != 0) {
         return UART_IO_ERROR;
     }
 
     uart->backend = *backend;
-    uart->baud_rate = baud_rate;
+    uart->baud_rate = config->baud_rate;
     uart->initialized = 1;
     return UART_OK;
 }
 
-uart_status_t uart_write(uart_t *uart, const uint8_t *data, size_t length)
+static uart_status_t uart_write_raw(uart_t *uart,
+                                   const uint8_t *data,
+                                   size_t length)
 {
     if (uart == NULL || !uart->initialized) {
         return UART_NOT_INITIALIZED;
@@ -43,6 +63,18 @@ uart_status_t uart_write(uart_t *uart, const uint8_t *data, size_t length)
         uart->error_count++;
         return UART_IO_ERROR;
     }
+    return UART_OK;
+}
+
+uart_status_t uart_write(uart_t *uart, const uint8_t *data, size_t length)
+{
+    uart_status_t status;
+
+    status = uart_write_raw(uart, data, length);
+    if (status != UART_OK) {
+        return status;
+    }
+
     uart->write_operations++;
     return UART_OK;
 }
@@ -68,11 +100,11 @@ uart_status_t uart_write_line(uart_t *uart,
         return UART_INVALID_ARGUMENT;
     }
 
-    status = uart_write(uart, data, length);
+    status = uart_write_raw(uart, data, length);
     if (status != UART_OK) {
         return status;
     }
-    return uart_write(uart, line_ending, line_ending_length);
+    return uart_write_raw(uart, line_ending, line_ending_length);
 }
 
 uart_status_t uart_read(uart_t *uart,
@@ -80,15 +112,19 @@ uart_status_t uart_read(uart_t *uart,
                         size_t length,
                         uint32_t timeout_ms)
 {
+    int backend_status;
+
     if (uart == NULL || !uart->initialized) {
         return UART_NOT_INITIALIZED;
     }
     if (data == NULL && length != 0u) {
         return UART_INVALID_ARGUMENT;
     }
-    if (uart->backend.read(uart->backend.context, data, length, timeout_ms) != 0) {
+
+    backend_status = uart->backend.read(uart->backend.context, data, length, timeout_ms);
+    if (backend_status != 0) {
         uart->error_count++;
-        return UART_TIMEOUT;
+        return backend_status < 0 ? UART_IO_ERROR : UART_TIMEOUT;
     }
     uart->read_operations++;
     return UART_OK;
