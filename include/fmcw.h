@@ -1,6 +1,7 @@
 #ifndef FMCW_H
 #define FMCW_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 typedef enum {
