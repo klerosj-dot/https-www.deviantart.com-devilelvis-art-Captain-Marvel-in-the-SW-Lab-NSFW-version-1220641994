@@ -321,6 +321,80 @@ static int test_receive_failures(void)
     return 0;
 }
 
+static int test_quick_integration(void)
+{
+    static const uint8_t payload[] = "READY";
+    uint8_t receive[5] = {0};
+    mock_uart_t mock = {
+        .received = {'R', 'E', 'A', 'D', 'Y'},
+        .received_length = sizeof(receive)
+    };
+    uart_backend_t backend = mock_backend(&mock);
+    uart_t uart = {0};
+    uart_diagnostics_t diagnostics;
+
+    if (expect(uart_init_with_baud(&uart, &backend, 115200u) == UART_OK,
+               "quick integration initializes UART") ||
+        expect(uart_write(&uart, payload, sizeof(payload) - 1u) == UART_OK,
+               "quick integration write succeeds") ||
+        expect(uart_read(&uart, receive, sizeof(receive), 25u) == UART_OK,
+               "quick integration read succeeds") ||
+        expect(memcmp(receive, mock.received, sizeof(receive)) == 0,
+               "quick integration payload matches") ||
+        expect(uart_generate_square_wave(&uart, 2000u, 2u) == UART_OK,
+               "quick integration square-wave succeeds") ||
+        expect(uart_get_diagnostics(&uart, &diagnostics) == UART_OK,
+               "quick integration diagnostics succeed") ||
+        expect(diagnostics.write_operations == 1u &&
+                   diagnostics.read_operations == 1u &&
+                   diagnostics.error_count == 0u,
+               "quick integration diagnostics are sane")) {
+        return 1;
+    }
+    return 0;
+}
+
+static int test_square_wave_signal(void)
+{
+    mock_uart_t mock = {0};
+    uart_backend_t backend = mock_backend(&mock);
+    uart_t uart = {0};
+
+    if (expect(uart_init(&uart, &backend) == UART_OK,
+               "square-wave test initializes UART") ||
+        expect(uart_generate_square_wave(&uart, 2500u, 5u) == UART_OK,
+               "square-wave signal generation succeeds") ||
+        expect(mock.square_wave_frequency == 2500u,
+               "square-wave frequency is set") ||
+        expect(mock.square_wave_cycles == 5u,
+               "square-wave cycle count is set")) {
+        return 1;
+    }
+    return 0;
+}
+
+static int test_four_character_string_receive(void)
+{
+    static const uint8_t expected[] = "PING";
+    mock_uart_t mock = {
+        .received = {'P', 'I', 'N', 'G'},
+        .received_length = sizeof(expected) - 1u
+    };
+    uart_backend_t backend = mock_backend(&mock);
+    uart_t uart = {0};
+    uint8_t receive[sizeof(expected) - 1u] = {0};
+
+    if (expect(uart_init(&uart, &backend) == UART_OK,
+               "4-char string init succeeds") ||
+        expect(uart_read(&uart, receive, sizeof(receive), 25u) == UART_OK,
+               "4-char string receive succeeds") ||
+        expect(memcmp(receive, expected, sizeof(expected) - 1u) == 0,
+               "4-char string payload matches")) {
+        return 1;
+    }
+    return 0;
+}
+
 static int test_invalid_usage(void)
 {
     uart_t uart = {0};
@@ -348,6 +422,9 @@ int main(void)
            test_serial_input_value_100() ||
            test_serial_input_value_50() ||
            test_unsigned_byte_receive() ||
+           test_quick_integration() ||
+           test_square_wave_signal() ||
+           test_four_character_string_receive() ||
            test_receive_failures() ||
            test_invalid_usage();
 }

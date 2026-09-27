@@ -34,6 +34,9 @@ The tests include serial-input cases that receive byte values `50` and `100`,
 plus a check that `0xFF` is preserved as unsigned byte value `255`.
 They also cover positive backend receive status as a timeout and negative
 backend receive status as an I/O error, including diagnostics accounting.
+A quick integration path validates one end-to-end init/write/read/square-wave
+sequence against a mock backend. It also includes a dedicated square-wave
+signal test and a four-character receive test for the string payload `PING`.
 
 ## FMCW sweep generation
 
