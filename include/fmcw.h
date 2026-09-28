@@ -17,7 +17,7 @@ typedef int (*fmcw_sample_callback_t)(void *context,
 
 typedef struct {
     uint32_t start_frequency_hz;
-    uint32_t stop_frequency_hz;
+    uint32_t bandwidth_hz;
     uint32_t duration_us;
     uint32_t sample_rate_hz;
     fmcw_sample_callback_t callback;

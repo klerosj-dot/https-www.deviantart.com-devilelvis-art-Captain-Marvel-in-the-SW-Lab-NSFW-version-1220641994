@@ -38,7 +38,7 @@ int main(void)
     sweep_capture_t capture = {0};
     fmcw_sweep_t sweep = {
         .start_frequency_hz = 1000000u,
-        .stop_frequency_hz = 2000000u,
+        .bandwidth_hz = 1000000u,
         .duration_us = 1000u,
         .sample_rate_hz = 10000u,
         .callback = capture_sample,
@@ -49,11 +49,32 @@ int main(void)
         expect(capture.calls == 10u, "expected sample count is generated") ||
         expect(capture.sample_count == 10u, "sample count is reported") ||
         expect(capture.first_frequency == 1000000u, "sweep starts at start frequency") ||
-        expect(capture.last_frequency == 2000000u, "sweep ends at stop frequency")) {
+        expect(capture.last_frequency == 2000000u, "sweep ends at start plus bandwidth")) {
+        return 1;
+    }
+
+    sweep.start_frequency_hz = 1500000u;
+    sweep.bandwidth_hz = 0u;
+    capture.calls = 0u;
+    if (expect(fmcw_generate(&sweep) == FMCW_OK,
+               "zero-bandwidth sweep succeeds") ||
+        expect(capture.calls == 10u && capture.first_frequency == 1500000u &&
+                   capture.last_frequency == 1500000u,
+               "zero bandwidth emits a constant frequency")) {
         return 1;
     }
 
     sweep.sample_rate_hz = 0u;
-    return expect(fmcw_generate(&sweep) == FMCW_INVALID_ARGUMENT,
-                  "zero sample rate is rejected");
+    if (expect(fmcw_generate(&sweep) == FMCW_INVALID_ARGUMENT,
+               "zero sample rate is rejected")) {
+        return 1;
+    }
+
+    sweep.sample_rate_hz = 10000u;
+    sweep.start_frequency_hz = UINT32_MAX - 10u;
+    sweep.bandwidth_hz = 11u;
+    capture.calls = 0u;
+    return expect(fmcw_generate(&sweep) == FMCW_INVALID_ARGUMENT &&
+                      capture.calls == 0u,
+                  "bandwidth that overflows the stop frequency is rejected");
 }

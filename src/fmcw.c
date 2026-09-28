@@ -3,12 +3,19 @@
 fmcw_status_t fmcw_generate(const fmcw_sweep_t *sweep)
 {
     uint64_t sample_count;
+    uint64_t stop_frequency;
     uint32_t index;
 
     if (sweep == NULL ||
         sweep->callback == NULL ||
         sweep->sample_rate_hz == 0u ||
         sweep->duration_us == 0u) {
+        return FMCW_INVALID_ARGUMENT;
+    }
+
+    stop_frequency = (uint64_t)sweep->start_frequency_hz +
+                     (uint64_t)sweep->bandwidth_hz;
+    if (stop_frequency > UINT32_MAX) {
         return FMCW_INVALID_ARGUMENT;
     }
 
@@ -30,8 +37,7 @@ fmcw_status_t fmcw_generate(const fmcw_sweep_t *sweep)
 
     for (index = 0u; index < (uint32_t)sample_count; index++) {
         int64_t start_frequency = (int64_t)sweep->start_frequency_hz;
-        int64_t stop_frequency = (int64_t)sweep->stop_frequency_hz;
-        int64_t frequency_delta = stop_frequency - start_frequency;
+        int64_t frequency_delta = (int64_t)stop_frequency - start_frequency;
         int64_t frequency = start_frequency +
                             (frequency_delta * (int64_t)index) /
                                 ((int64_t)sample_count - 1ll);
