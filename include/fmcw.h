@@ -15,9 +15,15 @@ typedef int (*fmcw_sample_callback_t)(void *context,
                                       uint32_t sample_index,
                                       uint32_t sample_count);
 
+typedef enum {
+    FMCW_SWEEP_ASCENDING = 0,
+    FMCW_SWEEP_DESCENDING = 1
+} fmcw_sweep_direction_t;
+
 typedef struct {
     uint32_t start_frequency_hz;
     uint32_t bandwidth_hz;
+    fmcw_sweep_direction_t direction;
     uint32_t duration_us;
     uint32_t sample_rate_hz;
     fmcw_sample_callback_t callback;

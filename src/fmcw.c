@@ -9,14 +9,24 @@ fmcw_status_t fmcw_generate(const fmcw_sweep_t *sweep)
     if (sweep == NULL ||
         sweep->callback == NULL ||
         sweep->sample_rate_hz == 0u ||
-        sweep->duration_us == 0u) {
+        sweep->duration_us == 0u ||
+        (sweep->direction != FMCW_SWEEP_ASCENDING &&
+         sweep->direction != FMCW_SWEEP_DESCENDING)) {
         return FMCW_INVALID_ARGUMENT;
     }
 
-    stop_frequency = (uint64_t)sweep->start_frequency_hz +
-                     (uint64_t)sweep->bandwidth_hz;
-    if (stop_frequency > UINT32_MAX) {
-        return FMCW_INVALID_ARGUMENT;
+    if (sweep->direction == FMCW_SWEEP_ASCENDING) {
+        stop_frequency = (uint64_t)sweep->start_frequency_hz +
+                         (uint64_t)sweep->bandwidth_hz;
+        if (stop_frequency > UINT32_MAX) {
+            return FMCW_INVALID_ARGUMENT;
+        }
+    } else {
+        if (sweep->bandwidth_hz > sweep->start_frequency_hz) {
+            return FMCW_INVALID_ARGUMENT;
+        }
+        stop_frequency = (uint64_t)sweep->start_frequency_hz -
+                         (uint64_t)sweep->bandwidth_hz;
     }
 
     sample_count = ((uint64_t)sweep->sample_rate_hz *

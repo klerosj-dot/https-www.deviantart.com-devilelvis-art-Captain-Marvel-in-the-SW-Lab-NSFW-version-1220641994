@@ -42,10 +42,12 @@ signal test and a four-character receive test for the string payload `PING`.
 
 `fmcw_generate` streams a linear frequency-modulated continuous-wave sweep
 through a callback. Configure `start_frequency_hz` and `bandwidth_hz`; the
-sweep ends at `start_frequency_hz + bandwidth_hz`. The callback receives the
-current frequency in hertz, sample index, and total sample count. The
-implementation uses 64-bit intermediate arithmetic and rejects endpoint
-overflow while calculating sample timing and frequency ramps.
+sweep direction determines whether it ends at `start_frequency_hz +
+bandwidth_hz` (ascending) or `start_frequency_hz - bandwidth_hz` (descending).
+The callback receives the current frequency in hertz, sample index, and total
+sample count. The implementation uses 64-bit intermediate arithmetic and
+rejects endpoint overflow or underflow while calculating sample timing and
+frequency ramps.
 
 ## Diagnostics
 

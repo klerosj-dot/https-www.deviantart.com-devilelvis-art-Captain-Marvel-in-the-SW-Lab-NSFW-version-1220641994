@@ -39,6 +39,7 @@ int main(void)
     fmcw_sweep_t sweep = {
         .start_frequency_hz = 1000000u,
         .bandwidth_hz = 1000000u,
+        .direction = FMCW_SWEEP_ASCENDING,
         .duration_us = 1000u,
         .sample_rate_hz = 10000u,
         .callback = capture_sample,
@@ -53,6 +54,20 @@ int main(void)
         return 1;
     }
 
+    sweep.duration_us = 1000u;
+    sweep.sample_rate_hz = 1000u;
+    capture.calls = 0u;
+    if (expect(fmcw_generate(&sweep) == FMCW_OK,
+               "single-sample sweep succeeds") ||
+        expect(capture.calls == 1u && capture.sample_count == 1u &&
+                   capture.first_frequency == 1000000u &&
+                   capture.last_frequency == 1000000u,
+               "single-sample sweep emits its start frequency once")) {
+        return 1;
+    }
+
+    sweep.duration_us = 1000u;
+    sweep.sample_rate_hz = 10000u;
     sweep.start_frequency_hz = 1500000u;
     sweep.bandwidth_hz = 0u;
     capture.calls = 0u;
@@ -64,6 +79,18 @@ int main(void)
         return 1;
     }
 
+    sweep.start_frequency_hz = 2000000u;
+    sweep.bandwidth_hz = 500000u;
+    sweep.direction = FMCW_SWEEP_DESCENDING;
+    capture.calls = 0u;
+    if (expect(fmcw_generate(&sweep) == FMCW_OK,
+               "descending sweep succeeds") ||
+        expect(capture.calls == 10u && capture.first_frequency == 2000000u &&
+                   capture.last_frequency == 1500000u,
+               "descending sweep ends at start minus bandwidth")) {
+        return 1;
+    }
+
     sweep.sample_rate_hz = 0u;
     if (expect(fmcw_generate(&sweep) == FMCW_INVALID_ARGUMENT,
                "zero sample rate is rejected")) {
@@ -71,10 +98,20 @@ int main(void)
     }
 
     sweep.sample_rate_hz = 10000u;
+    capture.calls = 0u;
     sweep.start_frequency_hz = UINT32_MAX - 10u;
     sweep.bandwidth_hz = 11u;
-    capture.calls = 0u;
+    sweep.direction = FMCW_SWEEP_ASCENDING;
+    if (expect(fmcw_generate(&sweep) == FMCW_INVALID_ARGUMENT &&
+                   capture.calls == 0u,
+               "bandwidth that overflows the stop frequency is rejected")) {
+        return 1;
+    }
+
+    sweep.start_frequency_hz = 10u;
+    sweep.bandwidth_hz = 11u;
+    sweep.direction = FMCW_SWEEP_DESCENDING;
     return expect(fmcw_generate(&sweep) == FMCW_INVALID_ARGUMENT &&
                       capture.calls == 0u,
-                  "bandwidth that overflows the stop frequency is rejected");
+                  "bandwidth that underflows the stop frequency is rejected");
 }
